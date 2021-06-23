@@ -1,1 +1,1 @@
-# obsidian-encryption
+# Obsidian Encryption
