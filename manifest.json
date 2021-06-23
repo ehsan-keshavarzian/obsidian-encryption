@@ -1,0 +1,10 @@
+{
+	"id": "obsidian-encryption",
+	"name": "Obsidian Encryption",
+	"version": "0.1.0",
+	"minAppVersion": "0.11.3",
+	"description": "Encrypt/Decrypt sections in files",
+	"author": "Ehsan Keshavarzian",
+	"authorUrl": "https://github.com/ehsan-keshavarzian",
+	"isDesktopOnly": false
+}
