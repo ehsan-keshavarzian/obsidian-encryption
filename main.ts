@@ -1,41 +1,31 @@
 import { App, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
 import crypto from 'crypto';
 
-enum Algorithm {
-	aes256cbc = 'aes-256-cbc'	
-}
-
-enum Encoding {
-	hex = 'hex'	
-}
-
 interface ObsidianEncryptionSettings {
 	Password: string;
 	Algorithm: string;
-	Encoding: string;
-	IV_Length: int;
 }
 
 const DEFAULT_SETTINGS: ObsidianEncryptionSettings = {
 	Password: '',
-	Algorithm: 'aes-256-cbc',
-	Encoding: 'hex',
-	IV_Length: 16
+	Algorithm: 'aes-256-cbc'
 }
 
 export default class ObsidianEncryption extends Plugin {
 	settings: ObsidianEncryptionSettings;
+	encoding: string = 'hex';
+	iv_length: int = 16;
 
 	encrypt(): void {
-		const iv = crypto.randomBytes(this.settings.IV_Length);
+		const iv = crypto.randomBytes(this.iv_length);
 		const cipher = crypto.createCipheriv(this.settings.Algorithm, new Buffer(this.settings.Password), iv);
-		const encryptedData = Buffer.concat([cipher.update(data,), cipher.final(), iv]).toString(this.settings.Encoding);
+		const encryptedData = Buffer.concat([cipher.update(data,), cipher.final(), iv]).toString(this.encoding);
 	}
 	
 	decrypt(): void {
-		const binaryData = new Buffer(data, this.settings.Encoding);
-		const iv = binaryData.slice(-this.settings.IV_Length);
-		const encryptedData = binaryData.slice(0, binaryData.length - this.settings.IV_Length);
+		const binaryData = new Buffer(data, this.encoding);
+		const iv = binaryData.slice(-this.iv_length);
+		const encryptedData = binaryData.slice(0, binaryData.length - this.iv_length);
 		const decipher = crypto.createDecipheriv(this.settings.Algorithm, new Buffer(this.settings.Password), iv);
 		const decryptedData = Buffer.concat([decipher.update(encryptedData), decipher.final()]).toString();
 	}
@@ -106,6 +96,15 @@ class EncryptionSettingTab extends PluginSettingTab {
 			.addText(text => text
 				.setPlaceholder('Enter password')
 				.setValue('')
+				.onChange(async (value) => {
+					this.plugin.settings.Password = value;
+					await this.plugin.saveSettings();
+				}));
+		new Setting(containerEl)
+			.setName('Algorithm')
+			.setDesc('Encryption Algorithm')
+			.addText(text => text
+				.setValue('aes-256-cbc')
 				.onChange(async (value) => {
 					this.plugin.settings.Password = value;
 					await this.plugin.saveSettings();
