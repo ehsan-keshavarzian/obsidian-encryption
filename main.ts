@@ -26,39 +26,46 @@ const DEFAULT_SETTINGS: ObsidianEncryptionSettings = {
 export default class ObsidianEncryption extends Plugin {
 	settings: ObsidianEncryptionSettings;
 
+	encrypt(): void {
+		const iv = crypto.randomBytes(this.settings.IV_Length);
+		const cipher = crypto.createCipheriv(this.settings.Algorithm, new Buffer(this.settings.Password), iv);
+		const encryptedData = Buffer.concat([cipher.update(data,), cipher.final(), iv]).toString(this.settings.Encoding);
+	}
+	
+	decrypt(): void {
+		const binaryData = new Buffer(data, this.settings.Encoding);
+		const iv = binaryData.slice(-this.settings.IV_Length);
+		const encryptedData = binaryData.slice(0, binaryData.length - this.settings.IV_Length);
+		const decipher = crypto.createDecipheriv(this.settings.Algorithm, new Buffer(this.settings.Password), iv);
+		const decryptedData = Buffer.concat([decipher.update(encryptedData), decipher.final()]).toString();
+	}
+	
 	async onload() {
 		console.log('loading Obsidian Encryption');
 
 		await this.loadSettings();
 
 		this.addRibbonIcon('lock', 'Encrypt', () => {
-			const iv = crypto.randomBytes(settings.IV_Length);
-			const cipher = crypto.createCipheriv(settings.Algorithm, new Buffer(settings.Password), iv);
-			const encryptedData = Buffer.concat([cipher.update(data,), cipher.final(), iv]).toString(settings.Encoding);
+			this.encrypt();
 		});
 
    		this.addRibbonIcon('lock-open', 'Decrypt', () => {
-			const binaryData = new Buffer(data, settings.Encoding);
-			const iv = binaryData.slice(-settings.IV_Length);
-			const encryptedData = binaryData.slice(0, binaryData.length - settings.IV_Length);
-			const decipher = crypto.createDecipheriv(settings.Algorithm, new Buffer(settings.Password), iv);
-
-			const decryptedData = Buffer.concat([decipher.update(encryptedData), decipher.final()]).toString();
+			this.decrypt();
 		});
 
 		this.addCommand({
 			id: 'encrypt',
 			name: 'Encrypt',
 			callback: () => {
-			 	
+			 	this.encrypt();
 			}
 		});
 
-    this.addCommand({
+    		this.addCommand({
 			id: 'decrypt',
 			name: 'Decrypt',
 			callback: () => {
-			 	
+			 	this.decrypt();
 			}
 		});
 
