@@ -1,5 +1,8 @@
-import { App, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { App, Modal, Notice, Plugin, PluginSettingTab, Setting, MarkdownView } from 'obsidian';
 import crypto from 'crypto';
+
+const _PREFIX: string = '<secret>';
+const _SUFFIX: string = '</secret>';
 
 interface ObsidianEncryptionSettings {
 	Password: string;
@@ -16,6 +19,18 @@ export default class ObsidianEncryption extends Plugin {
 	encoding: string = 'hex';
 	iv_length: int = 16;
 
+	getEditor(): Editor {
+		const mdview = this.app.workspace.getActiveViewOfType(MarkdownView);
+		if (!mdview) {
+			return null;
+		}
+		const editor = mdview.sourceMode.cmEditor;
+		if (!editor) {
+			return null;
+		}
+		return editor;
+	}
+	
 	encrypt(): void {
 		const iv = crypto.randomBytes(this.iv_length);
 		const cipher = crypto.createCipheriv(this.settings.Algorithm, new Buffer(this.settings.Password), iv);
