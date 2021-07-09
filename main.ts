@@ -31,18 +31,42 @@ export default class ObsidianEncryption extends Plugin {
 		return editor;
 	}
 	
+	processText(text: string, process: (match: string) => string): string {
+		return text.replace(/<secret>(.+?)<\/secret>/g, function(match, contents, offset, input_string)
+		{
+			return "<secret>" + process(contents) + "</secret>";
+		});
+	}
+	
+	processDocument(process: (match: string) => string): void {
+		const editor = this.getEditor();
+		const text = editor.getValue();
+		const processedText = this.processText(text, process);
+		editor.setValue(processedText);
+	}
+	
 	encrypt(): void {
-		const iv = crypto.randomBytes(this.iv_length);
-		const cipher = crypto.createCipheriv(this.settings.Algorithm, new Buffer(this.settings.Password), iv);
-		const encryptedData = Buffer.concat([cipher.update(data,), cipher.final(), iv]).toString(this.encoding);
+		this.processDocument(this.encryptData);
 	}
 	
 	decrypt(): void {
+		this.processDocument(this.decryptData);
+	}
+	
+	encryptData(data: string): string {
+		const iv = crypto.randomBytes(this.iv_length);
+		const cipher = crypto.createCipheriv(this.settings.Algorithm, new Buffer(this.settings.Password), iv);
+		const encryptedData = Buffer.concat([cipher.update(data,), cipher.final(), iv]).toString(this.encoding);
+		return encryptedData;
+	}
+	
+	decryptData(data: string): string {
 		const binaryData = new Buffer(data, this.encoding);
 		const iv = binaryData.slice(-this.iv_length);
 		const encryptedData = binaryData.slice(0, binaryData.length - this.iv_length);
 		const decipher = crypto.createDecipheriv(this.settings.Algorithm, new Buffer(this.settings.Password), iv);
 		const decryptedData = Buffer.concat([decipher.update(encryptedData), decipher.final()]).toString();
+		return decryptedData;
 	}
 	
 	async onload() {
