@@ -31,26 +31,26 @@ export default class ObsidianEncryption extends Plugin {
 		return editor;
 	}
 	
-	processText(text: string, process: (match: string) => string): string {
-		return text.replace(/<secret>(.+?)<\/secret>/g, function(match, contents, offset, input_string)
+	processText(text: string, process: (match: string) => string, state: string): string {
+		return text.replace(/(<secret state="(plain|encrypted)">|<secret>)(?<secret>.+?)(<\/secret>)/g, function(match, p1, p2, p3, p4, offset, input_string)
 		{
-			return "<secret>" + process(contents) + "</secret>";
+			return "<secret state=\"" + state + "\">" + p3 + "</secret>";
 		});
 	}
 	
-	processDocument(process: (match: string) => string): void {
+	processDocument(process: (match: string) => string, state: string): void {
 		const editor = this.getEditor();
 		const text = editor.getValue();
-		const processedText = this.processText(text, process);
+		const processedText = this.processText(text, process, state);
 		editor.setValue(processedText);
 	}
 	
 	encrypt(): void {
-		this.processDocument(this.encryptData);
+		this.processDocument(this.encryptData, "encrypted");
 	}
 	
 	decrypt(): void {
-		this.processDocument(this.decryptData);
+		this.processDocument(this.decryptData, "plain");
 	}
 	
 	encryptData(data: string): string {
