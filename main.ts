@@ -1,4 +1,4 @@
-import { App, Modal, Notice, Plugin, PluginSettingTab, Setting, MarkdownView } from 'obsidian';
+import { App, Modal, Notice, Plugin, PluginSettingTab, Setting, MarkdownView, Editor } from 'obsidian';
 import crypto from 'crypto';
 
 const _PREFIX: string = '<secret>';
