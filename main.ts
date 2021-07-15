@@ -24,7 +24,7 @@ export default class ObsidianEncryption extends Plugin {
 		if (!mdview) {
 			return null;
 		}
-		const editor = mdview.sourceMode.cmEditor;
+		const editor = mdview.Editor;
 		if (!editor) {
 			return null;
 		}
