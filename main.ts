@@ -33,7 +33,7 @@ export default class ObsidianEncryption extends Plugin {
 		{
 			if (state == p2) 
 			{
-				return input_string;
+				return match;
 			}
 			return "<secret state=\"" + state + "\">" + p3 + "</secret>";
 		});
