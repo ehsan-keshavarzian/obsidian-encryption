@@ -1,9 +1,6 @@
 import { App, Modal, Notice, Plugin, PluginSettingTab, Setting, MarkdownView, Editor } from 'obsidian';
 import crypto from 'crypto';
 
-const _PREFIX: string = '<secret>';
-const _SUFFIX: string = '</secret>';
-
 interface ObsidianEncryptionSettings {
 	Password: string;
 	Algorithm: string;
@@ -34,6 +31,10 @@ export default class ObsidianEncryption extends Plugin {
 	processText(text: string, process: (match: string) => string, state: string): string {
 		return text.replace(/(<secret state="(plain|encrypted)">|<secret>)(?<secret>.+?)(<\/secret>)/g, function(match, p1, p2, p3, p4, offset, input_string)
 		{
+			if (state == p2) 
+			{
+				return input_string;
+			}
 			return "<secret state=\"" + state + "\">" + p3 + "</secret>";
 		});
 	}
