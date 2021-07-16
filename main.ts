@@ -35,7 +35,7 @@ export default class ObsidianEncryption extends Plugin {
 			{
 				return match;
 			}
-			return "<secret state=\"" + state + "\">" + p3 + "</secret>";
+			return "<secret state=\"" + state + "\">" + process(p3) + "</secret>";
 		});
 	}
 	
