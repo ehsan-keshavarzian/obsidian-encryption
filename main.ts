@@ -1,21 +1,54 @@
 import { App, Modal, Notice, Plugin, PluginSettingTab, Setting, MarkdownView, Editor } from 'obsidian';
-import crypto from 'crypto';
 
 interface ObsidianEncryptionSettings {
 	Password: string;
-	Algorithm: string;
 }
 
 const DEFAULT_SETTINGS: ObsidianEncryptionSettings = {
-	Password: '',
-	Algorithm: 'aes-256-cbc'
+	Password: ''
 }
 
 export default class ObsidianEncryption extends Plugin {
 	settings: ObsidianEncryptionSettings;
-	encoding: string = 'hex';
-	iv_length: int = 16;
-
+	
+	async replace(text: string, regex: RegExp, replacer: any) : Promise<string> {
+		const substrs = [];
+		let match;
+		let i = 0;
+		while (true) {
+			match = regex.exec(text);
+			if (match  !== null) {
+				substrs.push(text.slice(i, match.index));
+				substrs.push(replacer(...match));
+				i = regex.lastIndex;
+			} else {
+				break;
+			}
+		}
+		substrs.push(text.slice(i));
+		return (await Promise.all(substrs)).join('');
+	}
+	
+	async encryptData(data: string) : Promise<string> {
+		const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(this.settings.Password));
+		const iv = crypto.getRandomValues(new Uint8Array(12));
+		const algorithm = { name: 'AES-GCM', iv: iv };
+		const key = await crypto.subtle.importKey('raw', hash, { name: 'AES-GCM', iv: iv }, false, ['encrypt']);
+		const buffer = await crypto.subtle.encrypt(algorithm, key, new TextEncoder().encode(data));
+		const cipherText = btoa(Array.from(new Uint8Array(buffer)).map(byte => String.fromCharCode(byte)).join(''));
+		const ivHex = Array.from(iv).map(b => ('00' + b.toString(16)).slice(-2)).join('');
+		return ivHex + cipherText;
+	}
+	
+	async decryptData(ciphertext: string) : Promise<string> {
+		const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(this.settings.Password));
+		const iv = ciphertext.slice(0,24).match(/.{2}/g).map(byte => parseInt(byte, 16));
+		const algorithm = { name: 'AES-GCM', iv: new Uint8Array(iv) };
+		const key = await crypto.subtle.importKey('raw', hash, algorithm, false, ['decrypt']);
+		const buffer = await crypto.subtle.decrypt(algorithm, key, new Uint8Array(atob(ciphertext.slice(24)).match(/[\s\S]/g).map(ch => ch.charCodeAt(0))));
+		return new TextDecoder().decode(buffer);
+	}
+	
 	getEditor(): Editor {
 		const mdview = this.app.workspace.getActiveViewOfType(MarkdownView);
 		if (!mdview) {
@@ -28,22 +61,22 @@ export default class ObsidianEncryption extends Plugin {
 		return editor;
 	}
 	
-	processText(text: string, process: (match: string) => string, state: string): string {
-		return text.replace(/(<secret state="(plain|encrypted)">|<secret>)(?<secret>.+?)(<\/secret>)/g, function(match, p1, p2, p3, p4, offset, input_string)
-		{
-			if (state == p2) 
-			{
+	async processText(text: string, process: (match: string) => Promise<string>, state: string): Promise<string> {
+		return await this.replace(text, /(<secret state="(plain|encrypted)">|<secret>)(?<secret>.+?)(<\/secret>)/g, async (match:string, p1:any, p2:any, p3:any, p4:any, offset:any, input_string:any) => {
+			if (state === p2) {
 				return match;
 			}
-			return "<secret state=\"" + state + "\">" + process(p3) + "</secret>";
+			return "<secret state=\"" + state + "\">" + await process(p3) + "</secret>";
 		});
 	}
 	
 	processDocument(process: (match: string) => string, state: string): void {
 		const editor = this.getEditor();
 		const text = editor.getValue();
-		const processedText = this.processText(text, process, state);
-		editor.setValue(processedText);
+		this.processText(text, process, state)
+		.then(processedText => {
+			editor.setValue(processedText);
+		};
 	}
 	
 	encrypt(): void {
@@ -52,22 +85,6 @@ export default class ObsidianEncryption extends Plugin {
 	
 	decrypt(): void {
 		this.processDocument(this.decryptData, "plain");
-	}
-	
-	encryptData(data: string): string {
-		const iv = crypto.randomBytes(this.iv_length);
-		const cipher = crypto.createCipheriv(this.settings.Algorithm, new Buffer(this.settings.Password), iv);
-		const encryptedData = Buffer.concat([cipher.update(data,), cipher.final(), iv]).toString(this.encoding);
-		return encryptedData;
-	}
-	
-	decryptData(data: string): string {
-		const binaryData = new Buffer(data, this.encoding);
-		const iv = binaryData.slice(-this.iv_length);
-		const encryptedData = binaryData.slice(0, binaryData.length - this.iv_length);
-		const decipher = crypto.createDecipheriv(this.settings.Algorithm, new Buffer(this.settings.Password), iv);
-		const decryptedData = Buffer.concat([decipher.update(encryptedData), decipher.final()]).toString();
-		return decryptedData;
 	}
 	
 	async onload() {
@@ -136,15 +153,6 @@ class EncryptionSettingTab extends PluginSettingTab {
 			.addText(text => text
 				.setPlaceholder('Enter password')
 				.setValue('')
-				.onChange(async (value) => {
-					this.plugin.settings.Password = value;
-					await this.plugin.saveSettings();
-				}));
-		new Setting(containerEl)
-			.setName('Algorithm')
-			.setDesc('Encryption Algorithm')
-			.addText(text => text
-				.setValue('aes-256-cbc')
 				.onChange(async (value) => {
 					this.plugin.settings.Password = value;
 					await this.plugin.saveSettings();
