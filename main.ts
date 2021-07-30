@@ -1,11 +1,11 @@
-import { App, Modal, Notice, Plugin, PluginSettingTab, Setting, MarkdownView, Editor } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, MarkdownView, Editor } from 'obsidian';
 
 interface ObsidianEncryptionSettings {
 	Password: string;
 }
 
 const DEFAULT_SETTINGS: ObsidianEncryptionSettings = {
-	Password: ''
+	Password: 'master password'
 }
 
 export default class ObsidianEncryption extends Plugin {
@@ -33,7 +33,7 @@ export default class ObsidianEncryption extends Plugin {
 		const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(this.settings.Password));
 		const iv = crypto.getRandomValues(new Uint8Array(12));
 		const algorithm = { name: 'AES-GCM', iv: iv };
-		const key = await crypto.subtle.importKey('raw', hash, { name: 'AES-GCM', iv: iv }, false, ['encrypt']);
+		const key = await crypto.subtle.importKey('raw', hash, algorithm, false, ['encrypt']);
 		const buffer = await crypto.subtle.encrypt(algorithm, key, new TextEncoder().encode(data));
 		const cipherText = btoa(Array.from(new Uint8Array(buffer)).map(byte => String.fromCharCode(byte)).join(''));
 		const ivHex = Array.from(iv).map(b => ('00' + b.toString(16)).slice(-2)).join('');
@@ -49,18 +49,6 @@ export default class ObsidianEncryption extends Plugin {
 		return new TextDecoder().decode(buffer);
 	}
 	
-	getEditor(): Editor {
-		const mdview = this.app.workspace.getActiveViewOfType(MarkdownView);
-		if (!mdview) {
-			return null;
-		}
-		const editor = mdview.Editor;
-		if (!editor) {
-			return null;
-		}
-		return editor;
-	}
-	
 	async processText(text: string, process: (match: string) => Promise<string>, state: string): Promise<string> {
 		return await this.replace(text, /(<secret state="(plain|encrypted)">|<secret>)(?<secret>.+?)(<\/secret>)/g, async (match:string, p1:any, p2:any, p3:any, p4:any, offset:any, input_string:any) => {
 			if (state === p2) {
@@ -70,21 +58,20 @@ export default class ObsidianEncryption extends Plugin {
 		});
 	}
 	
-	processDocument(process: (match: string) => string, state: string): void {
-		const editor = this.getEditor();
+	processDocument(editor: Editor, view: MarkdownView, process: (match: string) => Promise<string>, state: string): void {
 		const text = editor.getValue();
 		this.processText(text, process, state)
 		.then(processedText => {
 			editor.setValue(processedText);
-		};
+		});
 	}
 	
-	encrypt(): void {
-		this.processDocument(this.encryptData, "encrypted");
+	encrypt(editor: Editor, view: MarkdownView): void {
+		this.processDocument(editor, view, this.encryptData, "encrypted");
 	}
 	
-	decrypt(): void {
-		this.processDocument(this.decryptData, "plain");
+	decrypt(editor: Editor, view: MarkdownView): void {
+		this.processDocument(editor, view, this.decryptData, "plain");
 	}
 	
 	async onload() {
@@ -92,28 +79,28 @@ export default class ObsidianEncryption extends Plugin {
 
 		await this.loadSettings();
 
-		this.addRibbonIcon('lock', 'Encrypt', () => {
-			this.encrypt();
-		});
-
-   		this.addRibbonIcon('lock-open', 'Decrypt', () => {
-			this.decrypt();
-		});
-
 		this.addCommand({
 			id: 'encrypt',
 			name: 'Encrypt',
-			callback: () => {
-			 	this.encrypt();
-			}
+			editorCallback: (editor: Editor, view: MarkdownView) => {
+			 	this.encrypt(editor, view);
+			},
+			hotkeys: [{
+				modifiers: ['Ctrl', 'Shift'],
+				key: 'e'
+			}]
 		});
 
-    		this.addCommand({
+    	this.addCommand({
 			id: 'decrypt',
 			name: 'Decrypt',
-			callback: () => {
-			 	this.decrypt();
-			}
+			editorCallback: (editor: Editor, view: MarkdownView) => {
+			 	this.decrypt(editor, view);
+			},
+			hotkeys: [{
+				modifiers: ['Ctrl', 'Shift'],
+				key: 'd'
+			}]
 		});
 
 		this.addSettingTab(new EncryptionSettingTab(this.app, this));
@@ -152,7 +139,7 @@ class EncryptionSettingTab extends PluginSettingTab {
 			.setDesc('Master Password')
 			.addText(text => text
 				.setPlaceholder('Enter password')
-				.setValue('')
+				.setValue(this.plugin.settings.Password)
 				.onChange(async (value) => {
 					this.plugin.settings.Password = value;
 					await this.plugin.saveSettings();
