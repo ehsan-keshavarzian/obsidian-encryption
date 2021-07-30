@@ -82,7 +82,7 @@ export default class ObsidianEncryption extends Plugin {
 	}
 	
 	async processText(text: string, process: (data: string, password: string) => Promise<string>, state: string, password: string): Promise<string> {
-		return await this.replace(text, /(<secret state="(plain|encrypted)">|<secret>)(?<secret>.+?)(<\/secret>)/g, async (match:string, p1:any, p2:any, p3:any, p4:any, offset:any, input_string:any) => {
+		return await this.replace(text, /(<secret state="(plain|encrypted)">|<secret>)(?<secret>[\s\S]+?)(<\/secret>)/g, async (match:string, p1:any, p2:any, p3:any, p4:any, offset:any, input_string:any) => {
 			if (state === p2) {
 				return match;
 			}
